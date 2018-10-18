@@ -1,0 +1,171 @@
+QWidget:window {					/* Borders around the code editor and debug window */
+	border: 0px solid #263238;
+	background-color: #263238;
+}
+QLabel {
+	background: transparent;
+	color: #CFD8DC;				/* Not sure about this one */
+}
+QListView {
+	background-color: #263238;
+	color: #546E7A;
+	outline: 0;
+	border: 2px solid transparent;
+}
+QTextEdit{
+    background-color: #364e5a;
+}
+QLineEdit {
+	background-color: #2c3f49;
+    border: 1px solid ;
+    border-color: #364e5a;
+    border-radius: 5px;
+	color: #546E7A;
+}
+QGraphicsView {
+    background-color: #364e5a;
+}
+/* === QGroupBox === */
+QGroupBox {
+    border: 1px solid transparent;
+    margin-top: 1em;
+}
+
+QGroupBox::title {
+	color: #80CBC4;
+    subcontrol-origin: margin;
+    left: 6px;
+    padding: 0 3px 0 3px;
+}
+
+QComboBox {
+
+	color: #546E7A;
+    background-color: #2c3f49;
+    border: 1px solid ;
+    border-color: #364e5a;
+    border-radius: 5px;
+	selection-background-color: transparent;
+	outline: 0;
+}
+
+QComboBox 
+{    
+    selection-background-color: transparent;
+	outline: 0;
+}
+
+
+
+/* === QScrollBar:horizontal === */
+QScrollBar:horizontal {
+	background: #263238;				/* Background where slider is not */
+	height: 10px;
+	margin: 0;
+}
+
+QScrollBar:vertical {
+	background: #263238;				/* Background where slider is not */
+	width: 10px;
+	margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background: #37474F;					/* Slider color */
+    min-width: 16px;
+	border-radius: 5px;
+}
+
+QScrollBar::handle:vertical {
+    background: #37474F;					/* Slider color */
+    min-height: 16px;
+	border-radius: 5px;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal,
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+	background: none;												/* Removes the dotted background */
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {	/* Hides the slider arrows */
+      border: none;
+      background: none;
+}
+
+QPushButton {
+	background-color: transparent;
+	color: #546E7A;
+	/* border: 1px solid transparent; */
+    padding: 4px 22px;
+    border: 1px solid ;
+    border-color: #364e5a;
+    border-radius: 5px;
+}
+
+QPushButton:hover {
+    color: #AFBDC4;
+}
+
+QPushButton:pressed {
+	color: #FFFFFF;
+}
+
+[accessibleName="modelTimeLineEdit"]{
+    background: transparent;
+    border: 1px solid  transparent;
+}
+
+QMenu {
+	background-color: #263238;		/* File Menu Background color */
+	color: #546E7A;
+}
+
+QMenu::item:selected {
+	color: #AFBDC4;
+}
+
+QMenu::item:pressed {
+	color: #FFFFFF;
+}
+
+QMenu::separator {
+	height: 1px;
+	background: transparent;			/* Could change this to #546E7A and reduce the margin top and bottom to 1px */
+	margin-left: 10px;
+	margin-right: 10px;
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+/* === QMenuBar === */
+QMenuBar {
+	background-color: #263238;
+	color: #546E7A;
+}
+
+QMenuBar::item {
+	background: transparent;
+}
+
+QMenuBar::item:disabled {
+	color: gray;
+}
+
+QMenuBar::item:selected {
+	color: #AFBDC4;
+}
+
+QMenuBar::item:pressed {
+	color: #FFFFFF;
+}
+
+
+QStatusBar::item {
+	color: #546E7A;
+	background-color: #263238;
+}
+
+QAbstractScrollArea  {	/* Borders around the code editor and debug window */
+	border: 0;
+}
