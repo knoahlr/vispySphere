@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QWidget, QFormLayout, QMainWindow, QGroupBox, QVBoxL
 QLabel, QTextEdit, QLineEdit, QPushButton, QFrame
 
 from defaultMenuBar import DefaultMenuBar
+from simulation import Simulation
 
 from pathlib import Path
 import numpy as np
@@ -17,9 +18,7 @@ from PIL import Image
 import cv2
 
 
-ICON = Path(r'..\articles\atom.png')
-
-DATA = r"..\data"
+ICON = Path(r'..\..\articles\atom.png')
 
 class SceneWindow(QMainWindow):
 
@@ -36,6 +35,7 @@ class SceneWindow(QMainWindow):
         '''Fields'''
 
         self.rangeIndex = 0
+        self.simulation = None
 
 
 
@@ -68,9 +68,19 @@ class SceneWindow(QMainWindow):
 
 
         ''' Rendered Video of scene'''
-        self.videoWidget = QtWidgets.QGraphicsView()
-        self.videoWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.twoVideoWidget = QWidget()
+        self.twoVideoWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.twoVideoWidgetLayout = QVBoxLayout()
         
+
+
+        self.video1Widget = QtWidgets.QGraphicsView()
+        self.video2Widget = QtWidgets.QGraphicsView()
+
+        self.twoVideoWidgetLayout.addWidget(self.video1Widget)
+        self.twoVideoWidgetLayout.addWidget(self.video2Widget)
+        
+        self.twoVideoWidget.setLayout(self.twoVideoWidgetLayout)
 
         '''Labels'''
 
@@ -93,44 +103,14 @@ class SceneWindow(QMainWindow):
 
     def addCanvas(self):
 
-        self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='white',
-                           size=(800, 600), show=False)
-
-        self.view = self.canvas.central_widget.add_view()
-    
-        self.view.camera = 'turntable'
-
-        print(self.view, dir(self.view))
-        print(self.view.camera, dir(self.view.camera))
-        self.newCameraRotation = Quaternion()
-
-        self.sphere1 = scene.visuals.Sphere(radius=.3, method='latitude', parent=self.view.scene,
-                                    edge_color='blue')
-
-        self.sphere2 = scene.visuals.Sphere(radius=.2, method='ico', parent=self.view.scene,
-                                    edge_color='blue')
-
-        self.sphere3 = scene.visuals.Sphere(radius=.3, rows=10, cols=10, depth=10,
-                                    method='cube', parent=self.view.scene,
-                                    edge_color='blue')
-        self.axis = scene.visuals.XYZAxis(parent=self.view.scene)
-
-        self.plane = scene.visuals.Plane(edge_color='blue', parent=self.view.scene, width=10, height=10)
-        self.plane.transform = STTransform(translate=[-2.5, -2.5, -2.5])
 
 
-        self.sphere1.transform = STTransform(translate=[-2.5, 0, 0])
-        self.sphere3.transform = STTransform(translate=[1.5, 2, 1])
+        self.simulation = Simulation(10)
 
-        
+        self.simulation.canvas.create_native()
 
-        self.view.camera.set_range(x=[-3, 3], y=[-3,3], z=[-3,3])
-        self.view.camera.set_state({'center': [0.0, 0.0, 0.0]})
-
-        self.canvas.create_native()
-
-        self.canvasWidgetLayout.addWidget(self.canvas.native)
-        self.canvasWidgetLayout.addWidget(self.videoWidget)
+        self.canvasWidgetLayout.addWidget(self.simulation.canvas.native)
+        self.canvasWidgetLayout.addWidget(self.twoVideoWidget)
 
         self.sphereRanges = list(np.linspace(-2.5,2.5,100))
 
@@ -151,40 +131,53 @@ class SceneWindow(QMainWindow):
         # self.view.camera.set_range(x=[-5, 1], y=[-5,1], z=[-3,3])
         # self.view.camera.set_state({'center': [0.0, 0.0, 0.0]})
         
-        imageArray = self.canvas.render()
-
-        rgbImage = cv2.cvtColor(imageArray, cv2.COLOR_BGR2RGB)
+        self.simulation.view.camera.elevation = 20
+        self.simulation.view.camera.azimuth = 85
         
+        imageArray = self.simulation.canvas.render()
+        rgbImage = cv2.cvtColor(imageArray, cv2.COLOR_BGR2RGB)
         image = QtGui.QImage(rgbImage.data, imageArray.shape[1], imageArray.shape[0], QtGui.QImage.Format_RGB888)
         
 
-        scene = QtWidgets.QGraphicsScene()
+        scene1 = QtWidgets.QGraphicsScene()
         pixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(image))
-        scene.addItem(pixmapItem)
+        scene1.addItem(pixmapItem)
 
-        self.videoWidget.setScene(scene)
 
+        self.simulation.view.camera.elevation = 20
+        self.simulation.view.camera.azimuth = 95
+
+        imageArray = self.simulation.canvas.render()
+        rgbImage = cv2.cvtColor(imageArray, cv2.COLOR_BGR2RGB)
+        image = QtGui.QImage(rgbImage.data, imageArray.shape[1], imageArray.shape[0], QtGui.QImage.Format_RGB888)
+        
+
+        scene2 = QtWidgets.QGraphicsScene()
+        pixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(image))
+        scene2.addItem(pixmapItem)
+
+        self.video1Widget.setScene(scene1)
+        self.video2Widget.setScene(scene2)
+
+        'Return camera to neutral x position after rendering the two images'
+        self.simulation.view.camera.elevation = 20
+        self.simulation.view.camera.azimuth = 90
            
-
+        
     def update(self):
         
 
-        cord = self.sphereRanges[self.rangeIndex]
-        self.sphere1.transform = STTransform(translate=[-2.5, 0, cord])
-        self.sphere3.transform = STTransform(translate=[cord, -2.5, 1])
+
+        self.simulation.motionControl()
+
+        # cord = self.sphereRanges[self.rangeIndex]
+        # self.sphere1.transform = STTransform(translate=[-2.5, 0, cord])
+        # self.sphere3.transform = STTransform(translate=[cord, -2.5, 1])
         # print(self.canvas.render())
-        print(self.view.camera.get_state(),self.view.camera.transform ,(self.view.camera._xlim, self.view.camera._ylim, self.view.camera._zlim,))
+        # print(self.view.camera.get_state(),self.view.camera.transform ,(self.view.camera._xlim, self.view.camera._ylim, self.view.camera._zlim,))
 
-        self.newCameraRotation = Quaternion(1, 0, cord, 3)
-        self.newCameraRotation =  self.newCameraRotation.create_from_euler_angles(0, 0, cord*36)
-
-        # self.canvas.push_viewport((3,3, cord*36,3))
-        
-        # self.view.camera.set_range( x=[-cord,cord],z=[-cord,cord])
-        # self.view.camera._quaternion = self.newCameraRotation
-        # self.view.camera._rotate_tr()
-        self.view.camera.elevation = 20
-        self.view.camera.azimuth = cord *72
+        # self.view.camera.elevation = 20
+        # self.view.camera.azimuth = cord *72
 
         
         self.setImage()
