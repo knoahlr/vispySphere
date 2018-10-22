@@ -30,7 +30,7 @@ if __name__ == "__main__":
     
     styleSheetFileString = str(styleSheetFile.readAll(), "utf-8") 
 
-    app.setStyleSheet(styleSheetFileString)
+    # app.setStyleSheet(styleSheetFileString)
 
     #app.setStyle(QCommonStyle())
 

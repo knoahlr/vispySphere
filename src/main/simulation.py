@@ -4,16 +4,26 @@ from vispy.visuals.transforms import STTransform
 from vispy.visuals.filters import Clipper, Alpha, ColorFilter
 from vispy.util.quaternion import Quaternion
 
+
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from random import randrange
 
+import numpy as np
 
+import copy
 
-class Simulation():
+from pathlib import Path
 
+import cv2
+
+class Simulation(QObject):
+
+    changePixmap = pyqtSignal()
 
     def __init__(self, n):
-
-        self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='white', size=(600, 800), show=False)
+        
+        super().__init__()
+        self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='white', size=(800, 600), show=False)
 
         self.elementCount = n
 
@@ -23,10 +33,12 @@ class Simulation():
 
         self.elementList = dict()
 
+        self.frameList = list()
+
         self.create_elements()
         
-        self.plane = scene.visuals.Plane(edge_color='blue', parent=self.view.scene, width=10, height=10)
-        self.plane.transform = STTransform(translate=[-2.5, -2.5, -2.5])
+        self.plane = scene.visuals.Plane(edge_color='blue', parent=self.view.scene, width=0.5, height=0.5)
+        self.plane.transform = STTransform(translate=[0, 0, 0])
         self.axis = scene.visuals.XYZAxis(parent=self.view.scene)
 
 
@@ -35,11 +47,13 @@ class Simulation():
 
         ''' 
             Range: 
-                    tuple for range of randomly generated value, integer or float.
+                    list for range of randomly generated value, integer or float.
         '''
 
         if event == 'radius':
             radius = randrange(range[0], range[1], 1) /11
+            if radius > 1.8: radius -= 1
+            # print(radius, end='\n\r')
             return radius
 
         if event == 'velocity' or event == "elementCount":
@@ -66,12 +80,13 @@ class Simulation():
                     objectCount = len(list(self.elementList.keys()))
                     name = "{0}{1}".format('sphere', objectCount+1)
                     dimension = self.randomize((1,5), event='radius')
-                    print(dimension)
+                    # print(dimension)
                     
                     self.elementList[name] = element()
                     self.elementList[name].type = 'sphere'
                     self.elementList[name].name = name
                     self.elementList[name].visual = scene.visuals.Sphere(radius=dimension, method='latitude', parent=self.view.scene, edge_color='blue', name=name)
+                    self.elementList[name].dimension = dimension
                     self.setPosition(name)
                     self.setVelocity(name)
 
@@ -83,6 +98,7 @@ class Simulation():
                     self.elementList[name].type = 'sphere'
                     self.elementList[name].name = name
                     self.elementList[name].visual = scene.visuals.Sphere(radius=dimension, method='latitude', parent=self.view.scene, edge_color='blue', name=name)
+                    self.elementList[name].dimension = dimension
                     self.setPosition(name)
                     self.setVelocity(name)
                     
@@ -92,7 +108,7 @@ class Simulation():
 
         x, y, z = self.randomize(event='pos')
         self.elementList[name].visual.transform = STTransform(translate=[x, y, z])
-        self.elementList[name].pos = (x, y, z)
+        self.elementList[name].pos = list((x, y, z))
 
     def setVelocity(self, name):
 
@@ -105,9 +121,11 @@ class Simulation():
 
 
 
-    def motionControl(self):
+    def motionControl(self, dt):
+        
+        dt = dt/1000
 
-        for elem in self.elementList.values():
+        for name, elem in self.elementList.items():
 
             x, y, z = elem.pos
             vx, vy, vz = elem.velocity
@@ -116,37 +134,31 @@ class Simulation():
             z = float(z)
 
 
-            if abs((x + vx*0.1)) > 7: 
+            if abs((x + vx*dt)) > 7: 
 
                 elem.velocity = (-vx, vy, vz)
-                x -=  vx*0.1
+                x -=  vx*dt
 
-            else: x +=  vx*0.1
+            else: x +=  vx*dt
             
-            if abs((y + vy*0.1)) > 10: 
+            if abs((y + vy*dt)) > 10: 
 
                 elem.velocity = (vx, -vy, vz)
-                y -=  vy*0.1
+                y -=  vy*dt
 
-            else: y +=  vy*0.1
+            else: y +=  vy*dt
             
-            if abs((z + vz*0.1)) > 5:
+            if abs((z + vz*dt)) > 5:
 
                 elem.velocity = (vx, vy, -vz) 
-                z -=  vz*0.1
+                z -=  vz*dt
                 
-            else: z +=  vz*0.1
+            else: z +=  vz*dt
 
-            elem.pos = (x, y, z)
+            elem.pos = list((x, y, z))
             elem.translate()
 
-
-
-
-
-
-
-
+        self.changePixmap.emit()
 
 
 class element():
@@ -156,7 +168,9 @@ class element():
         self.type = None
         self.visual = None
 
-        self.pos = None
+        self.dimension = None
+
+        self.pos = list()
 
         self.velocity = None
 
@@ -166,6 +180,93 @@ class element():
 
         if self.pos != None:
             self.visual.transform = STTransform(translate=[self.pos[0],self.pos[1], self.pos[2]])
+
+
+class FrameData():
+
+    def __init__(self, imageArray, elementList, scaleFactor, canvasSize, index):
+
+        self.imageArray  = imageArray
+        self.elementList = elementList.copy()
+        self.elementPosition = dict( (name, elem.pos) for name, elem in self.elementList.items())
+        self.index = index
+        self.scale_factor = scaleFactor
+        self.canvasSize = canvasSize
+
+        self.velocityMatrix = np.empty((self.canvasSize[1], self.canvasSize[0]))
+        self.depthMatrix = np.empty((self.canvasSize[1], self.canvasSize[0]))
+
+
+    def createMatrix(self, event='velocity'):
+
+        if event == "velocity": matrix = self.velocityMatrix
+        else: matrix = self.depthMatrix
+        print('\n\n\n')
+        for name, element in self.elementList.items():
+            print(self.elementPosition[name], end='\n')
+            center_x = round( (self.elementPosition[name][1] * (self.canvasSize[1] / self.scale_factor)) + self.canvasSize[0]/2 ) #center[0]
+            center_y = round( (-1*self.elementPosition[name][2] * (self.canvasSize[1] / self.scale_factor)) +  self.canvasSize[1]/2 )
+
+            d_pixels = round(2* element.dimension * (self.canvasSize[1] / self.scale_factor))
+
+            for pixelLine in range(d_pixels):
+
+                if (center_y - pixelLine) > 0 and (center_y + pixelLine) < self.canvasSize[1]:
+
+                    yPixelsPlus = matrix[center_y - pixelLine]
+                    yPixelsMinus = matrix[center_y + pixelLine]
+
+                    new_d_pixels = d_pixels - 2*pixelLine
+                    startPixel = round(center_x - (new_d_pixels/2))
+
+                    if startPixel < 0: startPixel = 0
+                
+
+                    for pixelNumber in range(new_d_pixels):
+
+                        xPixel = startPixel + pixelNumber
+
+                        if (xPixel) < self.canvasSize[0]:
+
+                            if event == "velocity":
+                                yPixelsMinus[xPixel] = 255 #element.velocity[0]
+                                yPixelsPlus[xPixel] = 255 #element.velocity[0]
+                            if event == "depth":
+                                yPixelsMinus[xPixel] = self.elementPosition[name][0]
+                                yPixelsPlus[xPixel] = self.elementPosition[name][0]
+
+
+
+
+            
+
+
+
+if __name__ == "__main__":
+
+
+    imageArray = np.empty((600,800))
+
+    for i in range(5):
+
+        center_x = randrange(0, 600, 1)
+        center_y = randrange(0, 800, 1)
+        center= (center_x, center_y)
+        print(center)
+
+        d_pixels = randrange(20, 100, 1)
+
+        imageArray = createMatrix(imageArray, center, d_pixels)
+
+    logFile = open(Path(r"../../logs/mainLog.log"), 'w')
+    sys.stdout = logFile
+    np.set_printoptions(threshold=np.inf)
+
+    print(imageArray, end='\n\n\n')
+
+    cv2.imwrite('..\..\logs\pic_vel.jpg', imageArray)
+
+
 
 
 
