@@ -245,6 +245,8 @@ class FrameData():
 if __name__ == "__main__":
 
 
+    ''' class Debugger '''
+
     imageArray = np.empty((600,800))
 
     for i in range(5):
@@ -256,7 +258,7 @@ if __name__ == "__main__":
 
         d_pixels = randrange(20, 100, 1)
 
-        imageArray = createMatrix(imageArray, center, d_pixels)
+        imageArray = createMatrix()
 
     logFile = open(Path(r"../../logs/mainLog.log"), 'w')
     sys.stdout = logFile

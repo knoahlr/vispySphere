@@ -6,7 +6,7 @@ from vispy.util.quaternion import Quaternion
 
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtWidgets import QWidget, QFormLayout, QMainWindow, QGroupBox, QVBoxLayout, QHBoxLayout, \
-QLabel, QTextEdit, QLineEdit, QPushButton, QFrame
+QLabel, QTextEdit, QLineEdit, QPushButton, QFrame, QGridLayout
 
 from defaultMenuBar import DefaultMenuBar
 from simulation import Simulation, FrameData
@@ -65,12 +65,15 @@ class SceneWindow(QMainWindow):
         ''' Frames'''
         self.canvasFrame = QGroupBox("Canvas Frame")
         self.controlFrame = QGroupBox("Control Frame")
+        self.renderFrame = QGroupBox()
 
         self.canvasFrameLayout  = QVBoxLayout(self.canvasFrame)
-        self.controlFrameLayout = QFormLayout(self.controlFrame)
+        self.controlFrameLayout = QGridLayout(self.controlFrame)
+        self.renderFrameLayout = QHBoxLayout()
+     
         # print(dir(self.controlFrameLayout.formAlignment()))
-        self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignCenter)
-        self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignTop)
+        # self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignCenter)
+        # self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignTop)
         
 
         self.canvasWidget = QWidget()
@@ -98,50 +101,64 @@ class SceneWindow(QMainWindow):
         
         self.twoVideoWidget.setLayout(self.twoVideoWidgetLayout)
 
-        '''Labels'''
+        '''Simulation parameters'''
         self.elementCount = QLabel("Elements")
+        self.elementCount.setMaximumSize(150,50)
         self.elementCountBox = QLineEdit()
-        self.elementCountBox.setMaximumSize(250,50)
+        self.elementCountBox.setMaximumSize(350,50)
         self.elementCountBox.setPlaceholderText('element count')
         self.elementCountBox.setText('10')
 
 
         self.setFunctionLabel = QLabel("Set Function")
+        self.setFunctionLabel.setMaximumSize(150,50)
         self.setFunctionBox = QLineEdit()
-        self.setFunctionBox.setMaximumSize(250,50)
+        self.setFunctionBox.setMaximumSize(350,50)
         self.setFunctionBox.setPlaceholderText("input Function in Cartesian Co-ordSinates")
 
         self.zoomLevel = QPushButton("Zoom")
+        self.zoomLevel.setMaximumSize(150,50)
         self.zoomInput = QLineEdit()
         self.zoomLevel.clicked.connect(self.setZoom)
         self.zoomInput.setPlaceholderText('Adjust zoom for camera')
-        self.zoomLevel.setMaximumSize(250,50)
-        self.zoomInput.setMaximumSize(250,50)
+        self.zoomInput.setMaximumSize(350,50)
 
+        self.simulationLengthLabel = QLabel('Simulation Length')
+        self.simulationLengthLabel.setMaximumSize(150,50)
+        self.simulationLengthBox = QLineEdit()
+        self.simulationLengthBox.setMaximumSize(350,50)
+        self.simulationLengthBox.setPlaceholderText('No. of Frames - default is 100')
 
+        ''' Render Button'''
         self.renderButton = QPushButton('Render')
         self.renderButton.clicked.connect(self.handleRender)
         self.renderButton.setMaximumSize(250,50)
         # self.renderButton.setAlignment(QtCore.Qt.AlignCenter)
 
-        self.controlFrameLayout.setWidget(0, QFormLayout.LabelRole, self.elementCount)
-        self.controlFrameLayout.setWidget(0, QFormLayout.FieldRole, self.elementCountBox)
+        self.controlFrameLayout.addWidget(self.elementCount, 0, 0 )
+        self.controlFrameLayout.addWidget(self.elementCountBox, 0, 1)
 
-        self.controlFrameLayout.setWidget(1, QFormLayout.LabelRole, self.zoomLevel)
-        self.controlFrameLayout.setWidget(1, QFormLayout.FieldRole, self.zoomInput)
+        self.controlFrameLayout.addWidget(self.zoomLevel, 0, 2)
+        self.controlFrameLayout.addWidget(self.zoomInput, 0, 3)
 
-        self.controlFrameLayout.setWidget(2, QFormLayout.LabelRole, self.setFunctionLabel)
-        self.controlFrameLayout.setWidget(2, QFormLayout.FieldRole, self.setFunctionBox)
+        self.controlFrameLayout.addWidget(self.setFunctionLabel,0, 4)
+        self.controlFrameLayout.addWidget(self.setFunctionBox,0, 5)
+        self.controlFrameLayout.addWidget(self.simulationLengthLabel, 0, 6)
+        self.controlFrameLayout.addWidget(self.simulationLengthBox, 0, 7)
 
-        self.controlFrameLayout.addWidget(self.renderButton)
+        self.renderFrameLayout.addWidget(self.renderButton)
+        # self.controlFrameLayout.setAlignment(self.canvasWidget, QtCore.Qt.AlignCenter)
         # self.canvasFrameLayout.addWidget(self.canvasWidget)
         
+        self.renderFrame.setLayout(self.renderFrameLayout)
         self.canvasWidget.setLayout(self.canvasWidgetLayout)
         self.canvasFrameLayout.addWidget(self.canvasWidget)
+        
         # self.canvasFrame.setLayout(self.canvasFrameLayout)
 
         self.verticalLayout.addWidget(self.canvasFrame)
         self.verticalLayout.addWidget(self.controlFrame)
+        self.verticalLayout.addWidget(self.renderFrame)
 
         self.setCentralWidget(self.centralwidget)
 
@@ -166,7 +183,18 @@ class SceneWindow(QMainWindow):
     def handleRender(self):
 
         n = self.elementCountBox.text()
+        simulationLength = self.simulationLengthBox.text()
 
+        if simulationLength:
+
+            try:
+                simulationLength = int(simulationLength)
+                self.simLimit = simulationLength
+            except Exception as e:
+
+                self.error = ErrorWindow("Simulation length has to be an Integer, default -- 100 has been used", self.Icon)
+                self.error.show()
+                
         try:
             n = int(n)
             if n > 100:
