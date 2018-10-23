@@ -20,7 +20,7 @@ class Simulation(QObject):
 
     changePixmap = pyqtSignal()
 
-    def __init__(self, n):
+    def __init__(self, n, index):
         
         super().__init__()
         self.canvas = scene.SceneCanvas(keys='interactive', bgcolor='white', size=(800, 600), show=False)
@@ -30,6 +30,7 @@ class Simulation(QObject):
         self.view = self.canvas.central_widget.add_view()
     
         self.view.camera = 'turntable'
+        self.index = index
 
         self.elementList = dict()
 
@@ -193,7 +194,7 @@ class FrameData():
         self.scale_factor = scaleFactor
         self.canvasSize = canvasSize
 
-        self.velocityMatrix = np.empty((self.canvasSize[1], self.canvasSize[0]))
+        self.velocityMatrix = np.full((self.canvasSize[1], self.canvasSize[0], 3), 255)
         self.depthMatrix = np.empty((self.canvasSize[1], self.canvasSize[0]))
 
 
@@ -201,9 +202,9 @@ class FrameData():
 
         if event == "velocity": matrix = self.velocityMatrix
         else: matrix = self.depthMatrix
-        print('\n\n\n')
+        # print('\n\n\n')
         for name, element in self.elementList.items():
-            print(self.elementPosition[name], end='\n')
+            # print(self.elementPosition[name], end='\n')
             center_x = round( (self.elementPosition[name][1] * (self.canvasSize[1] / self.scale_factor)) + self.canvasSize[0]/2 ) #center[0]
             center_y = round( (-1*self.elementPosition[name][2] * (self.canvasSize[1] / self.scale_factor)) +  self.canvasSize[1]/2 )
 
@@ -229,11 +230,11 @@ class FrameData():
                         if (xPixel) < self.canvasSize[0]:
 
                             if event == "velocity":
-                                yPixelsMinus[xPixel] = 255 #element.velocity[0]
-                                yPixelsPlus[xPixel] = 255 #element.velocity[0]
+                                yPixelsMinus[xPixel] = [element.velocity[0] * 200, element.velocity[1] * 200, element.velocity[2]* 200]
+                                yPixelsPlus[xPixel] = [element.velocity[0]* 200, element.velocity[1]* 200, element.velocity[2]* 200]
                             if event == "depth":
-                                yPixelsMinus[xPixel] = self.elementPosition[name][0]
-                                yPixelsPlus[xPixel] = self.elementPosition[name][0]
+                                yPixelsMinus[xPixel] = (self.elementPosition[name][0] + 8) * 15
+                                yPixelsPlus[xPixel] = (self.elementPosition[name][0] + 8) * 15
 
 
 

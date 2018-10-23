@@ -1,4 +1,4 @@
-import sys
+import sys, os
 from vispy import scene, app
 from vispy.visuals.transforms import STTransform
 from vispy.visuals.filters import Clipper, Alpha, ColorFilter
@@ -37,7 +37,9 @@ class SceneWindow(QMainWindow):
 
         '''Fields'''
 
-        self.simLimit = 100
+        self.simLimit = None
+        self.simulationNo = None
+        self.elementCount = None
         self.simLength = 0
         self.simulation = None
         self.frameList = []
@@ -70,11 +72,6 @@ class SceneWindow(QMainWindow):
         self.canvasFrameLayout  = QVBoxLayout(self.canvasFrame)
         self.controlFrameLayout = QGridLayout(self.controlFrame)
         self.renderFrameLayout = QHBoxLayout()
-     
-        # print(dir(self.controlFrameLayout.formAlignment()))
-        # self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignCenter)
-        # self.controlFrameLayout.setFormAlignment(QtCore.Qt.AlignTop)
-        
 
         self.canvasWidget = QWidget()
         self.canvasWidget.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -120,7 +117,7 @@ class SceneWindow(QMainWindow):
         self.zoomLevel.setMaximumSize(150,50)
         self.zoomInput = QLineEdit()
         self.zoomLevel.clicked.connect(self.setZoom)
-        self.zoomInput.setPlaceholderText('Adjust zoom for camera')
+        self.zoomInput.setPlaceholderText('Adjust zoom for camera - default scale is 10.')
         self.zoomInput.setMaximumSize(350,50)
 
         self.simulationLengthLabel = QLabel('Simulation Length')
@@ -128,6 +125,13 @@ class SceneWindow(QMainWindow):
         self.simulationLengthBox = QLineEdit()
         self.simulationLengthBox.setMaximumSize(350,50)
         self.simulationLengthBox.setPlaceholderText('No. of Frames - default is 100')
+        self.simulationLengthBox.setText('500')
+
+        self.simulationsLabel = QLabel('Simulations')
+        self.simulationsLabel.setMaximumSize(150, 50)
+        self.simulationsBox = QLineEdit()
+        self.simulationsBox.setMaximumSize(350,50)
+        self.simulationsBox.setPlaceholderText('No. of simulations')
 
         ''' Render Button'''
         self.renderButton = QPushButton('Render')
@@ -145,6 +149,8 @@ class SceneWindow(QMainWindow):
         self.controlFrameLayout.addWidget(self.setFunctionBox,0, 5)
         self.controlFrameLayout.addWidget(self.simulationLengthLabel, 0, 6)
         self.controlFrameLayout.addWidget(self.simulationLengthBox, 0, 7)
+        self.controlFrameLayout.addWidget(self.simulationsLabel, 0, 8)
+        self.controlFrameLayout.addWidget(self.simulationsBox, 0, 9)
 
         self.renderFrameLayout.addWidget(self.renderButton)
         # self.controlFrameLayout.setAlignment(self.canvasWidget, QtCore.Qt.AlignCenter)
@@ -184,6 +190,7 @@ class SceneWindow(QMainWindow):
 
         n = self.elementCountBox.text()
         simulationLength = self.simulationLengthBox.text()
+        simulations = self.simulationsBox.text()
 
         if simulationLength:
 
@@ -194,8 +201,22 @@ class SceneWindow(QMainWindow):
 
                 self.error = ErrorWindow("Simulation length has to be an Integer, default -- 100 has been used", self.Icon)
                 self.error.show()
+
+        else: self.simLimit = 100
+        
+        if simulations:
+
+            try:
+                simulations = int(simulations)
+                self.simulationNo = simulations
+            except Exception as e:
+                self.error = ErrorWindow("No of simulations has to be an integer - only one simulation will be ran", self.Icon)
+                self.error.show()
+
+        else: self.simulationNo = 1
                 
         try:
+
             n = int(n)
             if n > 100:
                 self.error = ErrorWindow("element count can`t be greater than 100", self.Icon)
@@ -203,7 +224,7 @@ class SceneWindow(QMainWindow):
 
                 return
 
-            
+            else: self.elementCount = n
 
         except Exception as e:
 
@@ -213,16 +234,18 @@ class SceneWindow(QMainWindow):
             self.error.show()
 
             return
-        self.addCanvas(n)
+
+        self.create_simulation(self.elementCount, 1)
 
 
 
-    def addCanvas(self, elementCount):
+
+    def create_simulation(self, elementCount, sim_index):
 
         
         self.th = QtCore.QThread()
 
-        self.simulation = Simulation(elementCount)
+        self.simulation = Simulation(elementCount, sim_index)
         self.simulation.moveToThread(self.th)
         self.simulation.changePixmap.connect(self.update)
         self.pixmapChanged.connect(self.simulation.motionControl)
@@ -277,7 +300,6 @@ class SceneWindow(QMainWindow):
         pixmapItem = QtWidgets.QGraphicsPixmapItem(QtGui.QPixmap.fromImage(image))
         scene2.addItem(pixmapItem)
 
-        # self.canvasHolder.setScene(mainScene)
         self.video1Widget.setScene(scene1)
         self.video2Widget.setScene(scene2)
 
@@ -300,33 +322,51 @@ class SceneWindow(QMainWindow):
         dt = self.timer.elapsed()
         self.timer.restart()
 
+        self.pixmapChanged.emit(dt)
+
         if self.simLength == self.simLimit:
+
             self.pixmapChanged.disconnect()
             self.simulation.changePixmap.disconnect()
 
+            currSim = self.simulation.index
             self.writeData()
 
+            if currSim < self.simulationNo: 
 
-        self.pixmapChanged.emit(dt)
+                self.th.exit()
+                while not self.th.isFinished(): time.sleep(0.5)
+
+                self.simLength = 0  
+                self.canvasHolderLayout.removeWidget(self.native)
+                self.create_simulation(self.elementCount, currSim + 1)
+            
+            else: self.close()
 
     def writeData(self):
         
         index = 0
+        
+        if not Path(r'..\..\logs\simulations\originalImages\simulation_{0}'.format(self.simulation.index)).is_dir(): os.makedirs(r'..\..\logs\simulations\originalImages\simulation_{0}'.format(self.simulation.index))
+        if not Path(r'..\..\logs\simulations\velocityImages\simulation_{0}'.format(self.simulation.index)).is_dir(): os.makedirs(r'..\..\logs\simulations\velocityImages\simulation_{0}'.format(self.simulation.index))
+        if not Path(r'..\..\logs\simulations\depthMatrix\simulation_{0}'.format(self.simulation.index)).is_dir(): os.makedirs(r'..\..\logs\simulations\depthMatrix\simulation_{0}'.format(self.simulation.index))
+        
 
         for frameData in self.simulation.frameList:
 
             frameData.createMatrix()
+            frameData.createMatrix(event='depth')
 
-            print(frameData.imageArray.shape, frameData.velocityMatrix.shape)
-
-            filenameO = r'..\..\logs\originalImages\frame{0}.jpg'.format(index)
-            filenameV = r'..\..\logs\velocityImages\frame{0}.jpg'.format(index)
+            filenameO = r'..\..\logs\simulations\originalImages\simulation_{0}\frame{1}.jpg'.format(self.simulation.index, index)
+            filenameV = r'..\..\logs\simulations\velocityImages\simulation_{0}\frame{1}.jpg'.format(self.simulation.index, index)
+            filenameD = r'..\..\logs\simulations\depthMatrix\simulation_{0}\frame{1}.jpg'.format(self.simulation.index, index)
             cv2.imwrite(filenameO, frameData.imageArray)
             cv2.imwrite(filenameV, frameData.velocityMatrix)
+            cv2.imwrite(filenameD, frameData.depthMatrix)
 
             index  += 1
 
-        self.close()
+        
 
 
 
